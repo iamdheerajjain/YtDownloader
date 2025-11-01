@@ -25,15 +25,20 @@ pipeline {
       }
     }
 
-    stage('Unit Tests') {
-      steps {
+    
+  stage('Unit Tests') {
+    steps {
         dir('app') {
-          sh 'python -m pip install --upgrade pip'
-          sh 'pip install -r requirements.txt'
-          sh 'pytest -q || true'
-        }
+            sh '''
+                python -m pip install --upgrade pip
+                python -m pip install --user -r requirements.txt
+                export PATH=$PATH:/var/lib/jenkins/.local/bin
+                echo "PATH is: $PATH"
+                python -m pytest -q || true
+            '''
+          }
       }
-    }
+  }
 
     stage('Build Docker Image') {
       steps {
