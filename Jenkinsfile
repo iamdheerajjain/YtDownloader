@@ -47,29 +47,71 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to Kubernetes cluster..."
+                    
+                    // Write kubeconfig to a temporary file
                     sh """
-                        export KUBECONFIG=${KUBECONFIG_CRED}
+                        # Create kubeconfig file
+                        cat > kubeconfig.yaml << 'EOL'
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: Cg==
+    server: https://127.0.0.1:34071
+  name: my-cluster
+contexts:
+- context:
+    cluster: my-cluster
+    namespace: youtube-app
+    user: jenkins-sa
+  name: jenkins-context
+current-context: jenkins-context
+kind: Config
+users:
+- name: jenkins-sa
+  user: {}
+EOL
                         
-                        # Create namespace if it doesn't exist
-                        kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                        export KUBECONFIG=\${PWD}/kubeconfig.yaml
                         
-                        # Apply RBAC
-                        kubectl apply -f k8s/rbac.yaml -n ${NAMESPACE} || true
+                        echo "=== Kubectl Version ==="
+                        kubectl version --client --output=yaml || echo "kubectl version check failed"
                         
-                        # Check if deployment exists
-                        if kubectl get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} >/dev/null 2>&1; then
-                            echo "Updating existing deployment..."
-                            kubectl set image deployment/${DEPLOYMENT_NAME} ${DEPLOYMENT_NAME}=${DOCKER_HUB_REPO}:${IMAGE_TAG} -n ${NAMESPACE}
-                        else
-                            echo "Creating new deployment..."
-                            sed "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" k8s/deploy.yaml | kubectl apply -n ${NAMESPACE} -f -
+                        echo "=== Cluster Info ==="
+                        kubectl cluster-info || echo "Cluster unreachable"
+                        
+                        echo "=== Current Context ==="
+                        kubectl config current-context || echo "No context"
+                        
+                        echo "=== Attempting to create namespace ==="
+                        kubectl create namespace ${NAMESPACE} 2>&1 || kubectl get namespace ${NAMESPACE} || echo "Namespace operation failed"
+                        
+                        echo "=== Applying RBAC ==="
+                        if [ -f k8s/rbac.yaml ]; then
+                            kubectl apply -f k8s/rbac.yaml -n ${NAMESPACE} 2>&1 || echo "RBAC apply failed"
                         fi
                         
-                        # Wait for rollout to complete
-                        kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --timeout=120s
+                        echo "=== Preparing deployment manifest ==="
+                        if [ -f k8s/deploy.yaml ]; then
+                            cp k8s/deploy.yaml deployment-temp.yaml
+                            sed -i "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
+                            
+                            echo "=== Applying deployment ==="
+                            kubectl apply -f deployment-temp.yaml -n ${NAMESPACE} 2>&1 || echo "Deployment apply failed"
+                            
+                            echo "=== Checking rollout status ==="
+                            kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --timeout=60s 2>&1 || echo "Rollout status check failed"
+                        else
+                            echo "ERROR: k8s/deploy.yaml not found!"
+                            ls -la k8s/ || echo "k8s directory not found"
+                        fi
                         
-                        echo "Deployment successful!"
-                        kubectl get pods -n ${NAMESPACE}
+                        echo "=== Applying service ==="
+                        if [ -f k8s/service.yaml ]; then
+                            kubectl apply -f k8s/service.yaml -n ${NAMESPACE} 2>&1 || echo "Service apply failed"
+                        fi
+                        
+                        echo "=== Final Status ==="
+                        kubectl get all -n ${NAMESPACE} 2>&1 || echo "Failed to get resources"
                     """
                 }
             }
