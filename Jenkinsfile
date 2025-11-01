@@ -40,15 +40,19 @@ pipeline {
       }
   }
 
-    stage('Build Docker Image') {
-      steps {
+    
+  stage('Build Docker Image') {
+    steps {
         script {
-          IMAGE_TAG = "${env.BUILD_ID}-${env.GIT_COMMIT.take(7)}"
-          IMAGE_FULL = "${REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
-        }
-        sh "docker build -t ${IMAGE_FULL} ."
+            def repo = env.DOCKER_HUB_REPO ?: "prakuljain/yt-downloader"
+            def tag = env.IMAGE_TAG ?: "latest"
+            echo "Building Docker image ${repo}:${tag}" 
+            sh """
+                docker build -t ${repo}:${tag} .
+            """
+          }
       }
-    }
+  }
 
     stage('Push Image') {
       steps {
