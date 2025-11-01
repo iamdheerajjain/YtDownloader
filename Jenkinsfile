@@ -4,10 +4,10 @@ pipeline {
     environment {
         DOCKER_HUB_REPO = "prakuljain/yt-downloader"
         IMAGE_TAG = "latest"
-        REG_USER = credentials('dockerhub-username')
-        REG_PASS = credentials('dockerhub-password')
-        KUBECONFIG = credentials('kubeconfig-jenkins.yaml')
+        KUBECONFIG_CRED = credentials('kubeconfig-jenkins')
         GITHUB_TOKEN = credentials('github-token')
+        NAMESPACE = "youtube-app"
+        DEPLOYMENT_NAME = "youtube-api"
     }
 
     stages {
@@ -32,12 +32,14 @@ pipeline {
         stage('Push Image') {
             steps {
                 script {
-                    echo "Logging in to Docker Hub..."
-                    sh """
-                        echo ${REG_PASS} | docker login -u ${REG_USER} --password-stdin
-                        docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}
-                        docker logout
-                    """
+                    echo "Logging in to Docker Hub and pushing image..."
+                    withCredentials([usernamePassword(credentialsId: 'docker-registry', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh """
+                            echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
+                            docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                            docker logout
+                        """
+                    }
                 }
             }
         }
@@ -45,14 +47,14 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    echo "Deploying to Kubernetes..."
-                    writeFile file: 'kubeconfig.yaml', text: KUBECONFIG
-                    sh '''
-                        export KUBECONFIG=kubeconfig.yaml
-                        kubectl set image deployment/yt-downloader yt-downloader=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=default || \
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl rollout status deployment/yt-downloader --namespace=default
-                    '''
+                    echo "Deploying to Kubernetes cluster..."
+                    sh """
+                        # Make the deployment script executable
+                        chmod +x k8s-deploy.sh
+                        
+                        # Run the deployment script
+                        ./k8s-deploy.sh ${KUBECONFIG_CRED} ${NAMESPACE} ${DEPLOYMENT_NAME} ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                    """
                 }
             }
         }
@@ -61,13 +63,17 @@ pipeline {
     post {
         success {
             echo "Pipeline completed successfully!"
+            echo "Docker image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+            echo "Deployed to namespace: ${NAMESPACE}"
         }
         failure {
-            echo "Pipeline failed"
+            echo "Pipeline failed. Check the logs above for details."
         }
         always {
-            cleanWs()
+            script {
+                echo "Cleaning up workspace..."
+                cleanWs()
+            }
         }
     }
 }
-
