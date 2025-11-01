@@ -44,7 +44,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    echo "🚀 Deploying to Kubernetes..."
+                    echo "Deploying to Kubernetes..."
                     writeFile file: 'kubeconfig.yaml', text: KUBECONFIG
                     sh '''
                         export KUBECONFIG=kubeconfig.yaml
@@ -65,6 +65,8 @@ pipeline {
             echo "Pipeline failed"
         }
         always {
+          script {
+            echo "🧹 Cleaning workspace..."
             cleanWs()
         }
     }
