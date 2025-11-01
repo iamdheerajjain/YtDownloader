@@ -4,9 +4,10 @@ pipeline {
     environment {
         DOCKER_HUB_REPO = "prakuljain/yt-downloader"
         IMAGE_TAG = "latest"
-        REG_USER = credentials('prakuljain')
-        REG_PASS = credentials('divya123')
+        REG_USER = credentials('dockerhub-username')
+        REG_PASS = credentials('dockerhub-password')
         KUBECONFIG = credentials('kubeconfig-jenkins.yaml')
+        GITHUB_TOKEN = credentials('github-token')
     }
 
     stages {
@@ -65,9 +66,8 @@ pipeline {
             echo "Pipeline failed"
         }
         always {
-          script {
-            echo "🧹 Cleaning workspace..."
             cleanWs()
         }
     }
 }
+
