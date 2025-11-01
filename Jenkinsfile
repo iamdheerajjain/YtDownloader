@@ -48,11 +48,28 @@ pipeline {
                 script {
                     echo "Deploying to Kubernetes cluster..."
                     sh """
-                        # Make the deployment script executable
-                        chmod +x k8s-deploy.sh
+                        export KUBECONFIG=${KUBECONFIG_CRED}
                         
-                        # Run the deployment script
-                        ./k8s-deploy.sh ${KUBECONFIG_CRED} ${NAMESPACE} ${DEPLOYMENT_NAME} ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                        # Create namespace if it doesn't exist
+                        kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                        
+                        # Apply RBAC
+                        kubectl apply -f k8s/rbac.yaml -n ${NAMESPACE} || true
+                        
+                        # Check if deployment exists
+                        if kubectl get deployment ${DEPLOYMENT_NAME} -n ${NAMESPACE} >/dev/null 2>&1; then
+                            echo "Updating existing deployment..."
+                            kubectl set image deployment/${DEPLOYMENT_NAME} ${DEPLOYMENT_NAME}=${DOCKER_HUB_REPO}:${IMAGE_TAG} -n ${NAMESPACE}
+                        else
+                            echo "Creating new deployment..."
+                            sed "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" k8s/deploy.yaml | kubectl apply -n ${NAMESPACE} -f -
+                        fi
+                        
+                        # Wait for rollout to complete
+                        kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --timeout=120s
+                        
+                        echo "Deployment successful!"
+                        kubectl get pods -n ${NAMESPACE}
                     """
                 }
             }
@@ -61,12 +78,12 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully!"
+            echo "✅ Pipeline completed successfully!"
             echo "Docker image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
             echo "Deployed to namespace: ${NAMESPACE}"
         }
         failure {
-            echo "Pipeline failed. Check the logs above for details."
+            echo "❌ Pipeline failed. Check the logs above for details."
         }
     }
 }
