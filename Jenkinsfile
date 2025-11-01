@@ -5,7 +5,6 @@ pipeline {
         DOCKER_HUB_REPO = "prakuljain/yt-downloader"
         IMAGE_TAG = "latest"
         KUBECONFIG_CRED = credentials('kubeconfig-jenkins')
-        GITHUB_TOKEN = credentials('github-token')
         NAMESPACE = "youtube-app"
         DEPLOYMENT_NAME = "youtube-api"
     }
@@ -68,12 +67,6 @@ pipeline {
         }
         failure {
             echo "Pipeline failed. Check the logs above for details."
-        }
-        always {
-            script {
-                echo "Cleaning up workspace..."
-                cleanWs()
-            }
         }
     }
 }
