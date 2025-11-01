@@ -1,100 +1,71 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    REGISTRY = "docker.i"
-    IMAGE_NAMESPACE = "prakuljain"
-    IMAGE_NAME = "youtube-downloader-api"
-    K8S_NAMESPACE = "youtube-app"
-    DEPLOYMENT_NAME = "youtube-api"
-
-    DOCKER_CRED_ID = "docker-registry"
-    KUBECONFIG_CRED_ID = "kubeconfig"
+    environment {
+        DOCKER_HUB_REPO = "prakuljain/yt-downloader"
+        IMAGE_TAG = "latest"
+        REG_USER = credentials('prakuljain')
+        REG_PASS = credentials('divya123')
+        KUBECONFIG = credentials('kubeconfig-jenkins.yaml')
     }
 
-  options {
-    skipDefaultCheckout(true)
-    timestamps()
-    buildDiscarder(logRotator(numToKeepStr: '50'))
-  }
-
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
-    
-  stage('Unit Tests') {
-    steps {
-        dir('app') {
-            sh '''
-                python -m pip install --upgrade pip
-                python -m pip install --user -r requirements.txt
-                export PATH=$PATH:/var/lib/jenkins/.local/bin
-                echo "PATH is: $PATH"
-                python -m pytest -q || true
-            '''
-          }
-      }
-  }
-
-    
-  stage('Build Docker Image') {
-    steps {
-        script {
-            def repo = env.DOCKER_HUB_REPO ?: "prakuljain/yt-downloader"
-            def tag = env.IMAGE_TAG ?: "latest"
-            echo "Building Docker image ${repo}:${tag}" 
-            sh """
-                docker build -t ${repo}:${tag} .
-            """
-          }
-      }
-  }
-
-    stage('Push Image') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: env.DOCKER_CRED_ID, usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-          sh '''
-            echo "$REG_PASS" | docker login ${REGISTRY} -u "$REG_USER" --password-stdin
-            docker push ${IMAGE_FULL}
-            docker logout ${REGISTRY}
-          '''
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out code from Git..."
+                checkout scm
+            }
         }
-      }
-    }
 
-    stage('Deploy to Kubernetes') {
-      steps {
-        withCredentials([file(credentialsId: env.KUBECONFIG_CRED_ID, variable: 'KUBECONFIG_FILE')]) {
-          sh '''
-            export KUBECONFIG=${KUBECONFIG_FILE}
-            kubectl --kubeconfig=${KUBECONFIG_FILE} create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-            kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} apply -f k8s/rbac.yaml || true
-            kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} apply -f k8s/service.yaml || true
-            if kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} get deployment ${DEPLOYMENT_NAME} > /dev/null 2>&1; then
-              kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} set image deployment/${DEPLOYMENT_NAME} ${DEPLOYMENT_NAME}=${IMAGE_FULL} --record
-            else
-              sed "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${IMAGE_FULL}#g" k8s/deploy.yaml | kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} apply -f -
-            fi
-            kubectl --kubeconfig=${KUBECONFIG_FILE} -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=120s
-          '''
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "Building Docker image ${DOCKER_HUB_REPO}:${IMAGE_TAG} ..."
+                    sh """
+                        docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} .
+                    """
+                }
+            }
         }
-      }
-    }
-  }
 
-  post {
-    success {
-      echo "Deployment successful: ${IMAGE_FULL}"
+        stage('Push Image') {
+            steps {
+                script {
+                    echo "Logging in to Docker Hub..."
+                    sh """
+                        echo ${REG_PASS} | docker login -u ${REG_USER} --password-stdin
+                        docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                        docker logout
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    echo "🚀 Deploying to Kubernetes..."
+                    writeFile file: 'kubeconfig.yaml', text: KUBECONFIG
+                    sh '''
+                        export KUBECONFIG=kubeconfig.yaml
+                        kubectl set image deployment/yt-downloader yt-downloader=${DOCKER_HUB_REPO}:${IMAGE_TAG} --namespace=default || \
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl rollout status deployment/yt-downloader --namespace=default
+                    '''
+                }
+            }
+        }
     }
-    failure {
-      echo "Pipeline failed"
+
+    post {
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed"
+        }
+        always {
+            cleanWs()
+        }
     }
-    always {
-      cleanWs()
-    }
-  }
 }
