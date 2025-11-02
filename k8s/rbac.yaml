@@ -1,18 +1,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: jenkins-deploy
+  name: jenkins-sa
   namespace: youtube-app
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: jenkins-deploy-role
-  namespace: youtube-app
-rules:
-  - apiGroups: ["", "apps", "extensions"]
-    resources: ["deployments", "services", "pods", "configmaps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -21,9 +11,9 @@ metadata:
   namespace: youtube-app
 subjects:
   - kind: ServiceAccount
-    name: jenkins-deploy
+    name: jenkins-sa
     namespace: youtube-app
 roleRef:
-  kind: Role
-  name: jenkins-deploy-role
+  kind: ClusterRole
+  name: jenkins-role
   apiGroup: rbac.authorization.k8s.io

@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))  # MB
-DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
+DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', '/app/downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
 # Prometheus metrics

@@ -15,7 +15,7 @@ spec:
       labels:
         app: youtube-api
     spec:
-      serviceAccountName: jenkins-deploy
+      serviceAccountName: jenkins-sa
       containers:
         - name: youtube-api
           image: prakuljain/yt-downloader:latest
