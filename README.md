@@ -106,7 +106,7 @@ Kubernetes manifests are provided for deployment:
 kubectl apply -f k8s/
 
 # Or use the deployment script
-./scripts/k8s-deploy.sh kubeconfig.yaml youtube-app youtube-api prakuljain/yt-downloader:latest
+./scripts/k8s-deploy.sh kubeconfig-jenkins.yaml youtube-app youtube-api prakuljain/yt-downloader:latest
 ```
 
 ### Components

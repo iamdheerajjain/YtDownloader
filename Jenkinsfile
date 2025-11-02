@@ -309,7 +309,7 @@ pipeline {
                     }
                     
                     sh """
-                        export KUBECONFIG=\${PWD}/kubeconfig.yaml
+                        export KUBECONFIG=\${PWD}/kubeconfig-jenkins.yaml
                         
                         # Check if pods are running
                         echo "=== Checking pod status ==="
@@ -364,7 +364,7 @@ pipeline {
             script {
                 echo "Cleaning up temporary files..."
                 sh '''
-                    rm -f kubeconfig.yaml
+                    rm -f kubeconfig-jenkins.yaml
                     rm -f deployment-temp.yaml rbac-temp.yaml service-temp.yaml hpa-temp.yaml || true
                 '''
             }
