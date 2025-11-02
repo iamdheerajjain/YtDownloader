@@ -66,7 +66,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             when {
-                expression { params.RUN_TESTS }
+                expression { return params.RUN_TESTS }
             }
             steps {
                 script {
@@ -172,7 +172,7 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             when {
-                not { params.SKIP_DEPLOYMENT }
+                expression { return !params.SKIP_DEPLOYMENT }
             }
             steps {
                 script {
@@ -234,7 +234,7 @@ EOL
                         if [ -f k8s/deploy.yaml ]; then
                             # Update namespace and image in deployment file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/deploy.yaml > deployment-temp.yaml
-                            sed -i "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
+                            sed -i "s#prakuljain/yt-downloader:latest#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
                             
                             echo "=== Applying deployment ==="
                             kubectl apply -f deployment-temp.yaml 2>&1 || echo "Deployment apply failed"
@@ -269,7 +269,7 @@ EOL
 
         stage('Health Check') {
             when {
-                not { params.SKIP_DEPLOYMENT }
+                expression { return !params.SKIP_DEPLOYMENT }
             }
             steps {
                 script {
