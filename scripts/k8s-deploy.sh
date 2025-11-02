@@ -28,15 +28,12 @@ else
   sed "s#prakuljain/yt-downloader:latest#${IMAGE}#g" k8s/deploy.yaml | kubectl -n "$NAMESPACE" apply -f -
 fi
 
-# Apply service
 kubectl -n "$NAMESPACE" apply -f k8s/service.yaml
 
-# Apply HPA if it exists
 if [ -f k8s/hpa.yaml ]; then
   kubectl -n "$NAMESPACE" apply -f k8s/hpa.yaml || true
 fi
 
-# Wait for rollout
 kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=120s
 
 echo "Deployment successful!"

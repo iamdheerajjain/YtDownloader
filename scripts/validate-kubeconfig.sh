@@ -1,30 +1,22 @@
-#!/bin/bash
-
-# Script to validate kubeconfig file before using it in Jenkins pipeline
-
 set -euo pipefail
 
 KUBECONFIG_FILE="${1:-kubeconfig-jenkins.yaml}"
 
 echo "Validating kubeconfig file: $KUBECONFIG_FILE"
 
-# Check if file exists
 if [[ ! -f "$KUBECONFIG_FILE" ]]; then
     echo "Error: Kubeconfig file not found: $KUBECONFIG_FILE"
     exit 1
 fi
 
-# Export kubeconfig
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-# Validate basic structure using kubectl
 echo "Checking kubeconfig structure..."
 if ! kubectl config view >/dev/null 2>&1; then
     echo "Error: Invalid kubeconfig structure"
     exit 1
 fi
 
-# Check current context
 echo "Checking current context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
 if [[ -z "$CURRENT_CONTEXT" ]]; then
@@ -33,7 +25,6 @@ else
     echo "Current context: $CURRENT_CONTEXT"
 fi
 
-# Check clusters
 echo "Checking clusters..."
 CLUSTERS=$(kubectl config get-clusters 2>/dev/null || echo "")
 if [[ -z "$CLUSTERS" ]]; then
@@ -43,7 +34,6 @@ else
     echo "$CLUSTERS" | sed 's/^/  - /'
 fi
 
-# Check users
 echo "Checking users..."
 USERS=$(kubectl config view -o jsonpath='{.users[*].name}' 2>/dev/null || echo "")
 if [[ -z "$USERS" ]]; then
@@ -55,12 +45,23 @@ else
     done
 fi
 
-# Try to connect to cluster if possible
 echo "Testing cluster connectivity..."
 if kubectl cluster-info >/dev/null 2>&1; then
     echo "Success: Cluster is reachable"
 else
     echo "Warning: Cannot reach cluster (this is expected if running outside the cluster network)"
+fi
+
+echo "Testing authentication..."
+NAMESPACE=$(kubectl config view -o jsonpath='{.contexts[?(@.name=="jenkins-context")].context.namespace}' 2>/dev/null || echo "default")
+if [[ -z "$NAMESPACE" ]]; then
+    NAMESPACE="default"
+fi
+
+if kubectl auth can-i get pods --namespace="$NAMESPACE" >/dev/null 2>&1; then
+    echo "Success: Authentication is working"
+else
+    echo "Warning: Authentication failed - you may need to update your token"
 fi
 
 echo "Kubeconfig validation completed."

@@ -5,7 +5,6 @@ import os
 import time
 import logging
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -19,8 +18,6 @@ MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))  # MB
 DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
-# Prometheus metrics
-# Use a custom registry to avoid duplication issues during testing
 metrics_registry = CollectorRegistry()
 
 download_requests_total = Counter(
@@ -55,10 +52,8 @@ active_requests = Gauge(
     registry=metrics_registry
 )
 
-# Set app info metric
 app_info.labels(version=APP_VERSION).set(1)
 
-# Track active requests
 @app.before_request
 def before_request():
     active_requests.inc()
