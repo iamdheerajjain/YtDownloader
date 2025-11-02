@@ -18,8 +18,8 @@ spec:
       serviceAccountName: jenkins-deploy
       containers:
         - name: youtube-api
-          image: <IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>
-          imagePullPolicy: IfNotPresent
+          image: prakuljain/yt-downloader:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           readinessProbe:

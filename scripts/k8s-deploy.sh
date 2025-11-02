@@ -25,7 +25,15 @@ if kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" >/dev/null 2>&1; then
   kubectl -n "$NAMESPACE" set image deployment/"$DEPLOYMENT" "$DEPLOYMENT"="${IMAGE}"
 else
   echo "Creating new deployment..."
-  sed "s#<IMAGE_REGISTRY>/<IMAGE_NAME>:<IMAGE_TAG>#${IMAGE}#g" k8s/deploy.yaml | kubectl -n "$NAMESPACE" apply -f -
+  sed "s#prakuljain/yt-downloader:latest#${IMAGE}#g" k8s/deploy.yaml | kubectl -n "$NAMESPACE" apply -f -
+fi
+
+# Apply service
+kubectl -n "$NAMESPACE" apply -f k8s/service.yaml
+
+# Apply HPA if it exists
+if [ -f k8s/hpa.yaml ]; then
+  kubectl -n "$NAMESPACE" apply -f k8s/hpa.yaml || true
 fi
 
 # Wait for rollout
@@ -33,3 +41,4 @@ kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=120s
 
 echo "Deployment successful!"
 kubectl -n "$NAMESPACE" get pods
+kubectl -n "$NAMESPACE" get svc
