@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from yt_dlp import YoutubeDL
-from prometheus_client import Counter, Histogram, generate_latest, Gauge
+from prometheus_client import Counter, Histogram, generate_latest, Gauge, REGISTRY, CollectorRegistry
 import os
 import time
 import logging
@@ -16,31 +16,43 @@ app = Flask(__name__)
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))  # MB
-DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', '/app/downloads')
+DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
 # Prometheus metrics
+# Use a custom registry to avoid duplication issues during testing
+metrics_registry = CollectorRegistry()
+
 download_requests_total = Counter(
     'download_requests_total',
     'Total number of download requests',
-    ['status']
+    ['status'],
+    registry=metrics_registry
 )
+
 download_duration_seconds = Histogram(
     'download_duration_seconds',
-    'Time spent processing downloads'
+    'Time spent processing downloads',
+    registry=metrics_registry
 )
+
 health_check_counter = Counter(
     'health_check_requests_total',
-    'Total number of health check requests'
+    'Total number of health check requests',
+    registry=metrics_registry
 )
+
 app_info = Gauge(
     'app_info',
     'Application information',
-    ['version']
+    ['version'],
+    registry=metrics_registry
 )
+
 active_requests = Gauge(
     'active_requests',
-    'Number of active requests'
+    'Number of active requests',
+    registry=metrics_registry
 )
 
 # Set app info metric
@@ -125,7 +137,7 @@ def ready():
 @app.route('/metrics')
 def metrics():
     """Prometheus metrics endpoint"""
-    return generate_latest()
+    return generate_latest(metrics_registry)
 
 @app.route('/info', methods=['POST'])
 def get_info():
