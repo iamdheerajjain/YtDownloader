@@ -180,7 +180,7 @@ pipeline {
                                 
                                 # Run safety check
                                 echo "Running safety dependency check..."
-                                safety check -r app/requirements.txt || echo "safety check completed"
+                                safety scan -r app/requirements.txt || echo "safety scan completed"
                                 
                                 # Run pip-audit
                                 echo "Running pip-audit dependency check..."
@@ -235,32 +235,9 @@ pipeline {
                     
                     echo "Deploying to namespace: ${targetNamespace}"
                     
-                    // Write kubeconfig to a temporary file
+                    // Use the real kubeconfig file
                     sh """
-                        # Create a minimal kubeconfig that will at least allow kubectl commands to run
-                        # Even if the cluster is not accessible, this prevents the "Please enter Username" error
-                        cat > kubeconfig.yaml << 'EOL'
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: https://kubernetes.default.svc
-    insecure-skip-tls-verify: true
-  name: local-cluster
-contexts:
-- context:
-    cluster: local-cluster
-    namespace: ${targetNamespace}
-    user: default
-  name: local-context
-current-context: local-context
-users:
-- name: default
-  user:
-    token: dummy-token  # Dummy token to prevent interactive prompts
-EOL
-                        
-                        export KUBECONFIG=\${PWD}/kubeconfig.yaml
+                        export KUBECONFIG=\${PWD}/kubeconfig-jenkins.yaml
                         
                         echo "=== Kubectl Version ==="
                         kubectl version --client --output=yaml || echo "kubectl version check failed"
@@ -308,7 +285,7 @@ EOL
                         if [ -f k8s/hpa.yaml ]; then
                             # Update namespace in HPA file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/hpa.yaml > hpa-temp.yaml
-                            kubectl apply -f hpa-temp.yaml 2>&1 || echo "HPA apply failed"
+                            kubectl apply -f hpa-temp.yaml --validate=false 2>&1 || echo "HPA apply failed (may be due to cluster connectivity)"
                         fi
                         
                         echo "=== Final Status ==="

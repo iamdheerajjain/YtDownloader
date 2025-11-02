@@ -117,6 +117,15 @@ kubectl apply -f k8s/
 - **RBAC** - Secure access controls
 - **Namespace** - Isolated environment
 
+### Setting Up a Real Kubernetes Cluster
+
+By default, the project uses a placeholder kubeconfig for demonstration purposes. To deploy to a real Kubernetes cluster:
+
+1. Follow the detailed instructions in [REAL_CLUSTER_SETUP.md](REAL_CLUSTER_SETUP.md)
+2. Update `kubeconfig-jenkins.yaml` with your actual cluster endpoint and authentication credentials
+3. Ensure your Jenkins server can reach the Kubernetes API endpoint
+4. Configure proper RBAC permissions for the Jenkins service account
+
 ## 🧪 Testing
 
 Run unit tests with pytest:
@@ -158,6 +167,7 @@ The application exposes Prometheus metrics at `/metrics` endpoint:
 ├── Dockerfile             # Docker configuration
 ├── Jenkinsfile            # CI/CD pipeline definition
 ├── kubeconfig-jenkins.yaml# Kubernetes configuration for Jenkins
+├── REAL_CLUSTER_SETUP.md  # Instructions for real cluster setup
 └── README.md              # This file
 ```
 
