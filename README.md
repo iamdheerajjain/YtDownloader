@@ -120,9 +120,9 @@ The application exposes Prometheus metrics at `/metrics` endpoint:
 │   ├── main.py            # Flask application
 │   └── requirements.txt   # Python dependencies
 ├── docs/                  # Documentation
-│   ├── ci-cd-setup-guide.md
-│   ├── monitoring-logging.md
-│   └── test-plan.md
+│   ├── ci-cd-setup-guide.md # CI/CD setup instructions
+│   ├── monitoring-logging.md # Monitoring and logging strategy
+│   └── test-plan.md       # Test plan and validation procedures
 ├── k8s/                   # Kubernetes manifests
 │   ├── deploy.yaml
 │   ├── hpa.yaml
@@ -139,6 +139,14 @@ The application exposes Prometheus metrics at `/metrics` endpoint:
 └── README.md              # This file
 ```
 
+## 📚 Documentation
+
+Detailed documentation is available in the [docs](docs/) directory:
+
+- [CI/CD Setup Guide](docs/ci-cd-setup-guide.md) - Complete setup instructions
+- [Test Plan](docs/test-plan.md) - Validation procedures
+- [Monitoring & Logging](docs/monitoring-logging.md) - Observability strategy
+
 ## 🔧 Configuration
 
 Environment variables:
@@ -147,14 +155,6 @@ Environment variables:
 - `MAX_DOWNLOAD_SIZE` - Maximum download size in MB (default: 100)
 - `DOWNLOAD_FOLDER` - Folder for downloads (default: downloads)
 - `APP_VERSION` - Application version (default: 1.0.0)
-
-## 📚 Documentation
-
-Detailed documentation is available in the [docs](docs/) directory:
-
-- [CI/CD Setup Guide](docs/ci-cd-setup-guide.md) - Complete setup instructions
-- [Test Plan](docs/test-plan.md) - Validation procedures
-- [Monitoring & Logging](docs/monitoring-logging.md) - Observability strategy
 
 ## 🔒 Security
 

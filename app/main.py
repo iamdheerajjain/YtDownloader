@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 from yt_dlp import YoutubeDL
-from prometheus_client import Counter, Histogram, generate_latest
+from prometheus_client import Counter, Histogram, generate_latest, Gauge
 import os
 import time
 import logging
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -18,6 +19,7 @@ MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))  # MB
 DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
+# Prometheus metrics
 download_requests_total = Counter(
     'download_requests_total',
     'Total number of download requests',
@@ -31,6 +33,28 @@ health_check_counter = Counter(
     'health_check_requests_total',
     'Total number of health check requests'
 )
+app_info = Gauge(
+    'app_info',
+    'Application information',
+    ['version']
+)
+active_requests = Gauge(
+    'active_requests',
+    'Number of active requests'
+)
+
+# Set app info metric
+app_info.labels(version=APP_VERSION).set(1)
+
+# Track active requests
+@app.before_request
+def before_request():
+    active_requests.inc()
+
+@app.after_request
+def after_request(response):
+    active_requests.dec()
+    return response
 
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -63,7 +87,8 @@ def health():
     logger.debug("Health check performed")
     return jsonify({
         "status": "UP",
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "version": APP_VERSION
     })
 
 @app.route('/ready')
@@ -77,7 +102,8 @@ def ready():
                 "checks": {
                     "download_folder": "accessible",
                     "dependencies": "loaded"
-                }
+                },
+                "version": APP_VERSION
             })
         else:
             logger.warning("Readiness check failed - download folder not accessible")
@@ -85,13 +111,15 @@ def ready():
                 "status": "NOT_READY",
                 "checks": {
                     "download_folder": "not_accessible"
-                }
+                },
+                "version": APP_VERSION
             }), 503
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
         return jsonify({
             "status": "NOT_READY",
-            "error": str(e)
+            "error": str(e),
+            "version": APP_VERSION
         }), 503
 
 @app.route('/metrics')
@@ -121,11 +149,14 @@ def get_info():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': False,
-        }
+            'extract_flat': False
+        }  # type: dict
         
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
+            
+            # Handle potential None values
+            formats = info.get('formats') or []
             
             response_data = {
                 "status": "success",
@@ -137,7 +168,7 @@ def get_info():
                     "upload_date": info.get('upload_date'),
                     "description": info.get('description', '')[:200] + '...' if info.get('description') else None,
                     "thumbnail": info.get('thumbnail'),
-                    "formats_available": len(info.get('formats', []))
+                    "formats_available": len(formats)
                 }
             }
             

@@ -38,7 +38,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    echo "🔍 Checking out code from Git repository..."
+                    echo "Checking out code from Git repository..."
                     checkout scm
                     
                     // Display Git information
@@ -54,11 +54,14 @@ pipeline {
                 script {
                     echo "🔍 Running code quality checks..."
                     sh '''
-                        echo "No specific code quality tools configured yet"
-                        echo "In a production environment, you might run:"
-                        echo "- flake8 for Python code style checking"
-                        echo "- bandit for security scanning"
-                        echo "- sonar-scanner for comprehensive analysis"
+                        # Install quality checking tools
+                        pip3 install flake8 bandit
+                        
+                        # Run Python code style checking
+                        flake8 app/ --max-line-length=100 --exclude=__pycache__,*.pyc
+                        
+                        # Run security scanning
+                        bandit -r app/ -ll
                     '''
                 }
             }
@@ -70,7 +73,7 @@ pipeline {
             }
             steps {
                 script {
-                    echo "🧪 Running unit tests..."
+                    echo "Running unit tests..."
                     sh '''
                         # Create a virtual environment for testing
                         python3 -m venv test_env
@@ -89,7 +92,7 @@ pipeline {
             }
             post {
                 always {
-                    echo "🧹 Cleaning up test environment..."
+                    echo "Cleaning up test environment..."
                     sh 'rm -rf test_env || true'
                 }
             }
@@ -98,7 +101,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "🐳 Building Docker image ${DOCKER_HUB_REPO}:${IMAGE_TAG} ..."
+                    echo "Building Docker image ${DOCKER_HUB_REPO}:${IMAGE_TAG} ..."
                     sh """
                         docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} .
                         docker tag ${DOCKER_HUB_REPO}:${IMAGE_TAG} ${DOCKER_HUB_REPO}:${LATEST_TAG}
@@ -107,11 +110,11 @@ pipeline {
             }
             post {
                 success {
-                    echo "✅ Docker image built successfully"
+                    echo "Docker image built successfully"
                     sh "docker images ${DOCKER_HUB_REPO}"
                 }
                 failure {
-                    echo "❌ Docker image build failed"
+                    echo "Docker image build failed"
                 }
             }
         }
@@ -123,10 +126,13 @@ pipeline {
                         script {
                             echo "🛡️ Scanning Docker image for vulnerabilities..."
                             sh '''
-                                echo "In a production environment, you might run:"
-                                echo "- trivy image ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
-                                echo "- docker scan ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
-                                echo "- clair scan ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                                # Use Trivy for container scanning if available
+                                if command -v trivy &> /dev/null; then
+                                    trivy image --exit-code 0 --severity HIGH,CRITICAL ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                                else
+                                    echo "Trivy not available, skipping Docker image scan"
+                                    echo "Install Trivy to enable container vulnerability scanning"
+                                fi
                             '''
                         }
                     }
@@ -134,12 +140,17 @@ pipeline {
                 stage('Dependency Scan') {
                     steps {
                         script {
-                            echo "🛡️ Scanning dependencies for vulnerabilities..."
-                            sh '''
-                                echo "In a production environment, you might run:"
-                                echo "- safety check -r app/requirements.txt"
-                                echo "- pip-audit -r app/requirements.txt"
-                            '''
+                        echo "🛡️ Scanning dependencies for vulnerabilities..."
+                        sh '''
+                            # Install safety for dependency scanning
+                            pip3 install safety pip-audit
+                            
+                            # Run safety check
+                            safety check -r app/requirements.txt || echo "Safety check completed"
+                            
+                            # Run pip-audit
+                            pip-audit -r app/requirements.txt || echo "pip-audit completed"
+                        '''
                         }
                     }
                 }
@@ -149,7 +160,7 @@ pipeline {
         stage('Push Image') {
             steps {
                 script {
-                    echo "📤 Pushing image to Docker registry..."
+                    echo "Pushing image to Docker registry..."
                     withCredentials([usernamePassword(credentialsId: 'docker-registry', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                             echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
@@ -165,7 +176,7 @@ pipeline {
                     echo "✅ Docker images pushed successfully"
                 }
                 failure {
-                    echo "❌ Docker image push failed"
+                    echo "Docker image push failed"
                 }
             }
         }
@@ -176,7 +187,7 @@ pipeline {
             }
             steps {
                 script {
-                    echo "🚀 Deploying to Kubernetes cluster..."
+                    echo "Deploying to Kubernetes cluster..."
                     
                     // Set environment-specific configurations
                     def targetNamespace = "${NAMESPACE}-${params.DEPLOY_ENVIRONMENT}"
@@ -308,7 +319,7 @@ EOL
     post {
         success {
             script {
-                echo "🎉 Pipeline completed successfully!"
+                echo "Pipeline completed successfully!"
                 echo "Docker image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
                 echo "Deployed to namespace: ${NAMESPACE}-${params.DEPLOY_ENVIRONMENT}"
                 
@@ -316,27 +327,27 @@ EOL
                 /*
                 slackSend(
                     channel: '#jenkins',
-                    message: "✅ CI/CD Pipeline Successful!\\nRepository: ${env.GIT_URL}\\nBranch: ${env.GIT_BRANCH}\\nImage: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
+                    message: "CI/CD Pipeline Successful!\\nRepository: ${env.GIT_URL}\\nBranch: ${env.GIT_BRANCH}\\nImage: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
                 )
                 */
             }
         }
         failure {
             script {
-                echo "❌ Pipeline failed. Check the logs above for details."
+                echo "Pipeline failed. Check the logs above for details."
                 
                 // Send notification (configure as needed)
                 /*
                 slackSend(
                     channel: '#jenkins',
-                    message: "❌ CI/CD Pipeline Failed!\\nRepository: ${env.GIT_URL}\\nBranch: ${env.GIT_BRANCH}\\nPlease check Jenkins for details."
+                    message: "CI/CD Pipeline Failed!\\nRepository: ${env.GIT_URL}\\nBranch: ${env.GIT_BRANCH}\\nPlease check Jenkins for details."
                 )
                 */
             }
         }
         cleanup {
             script {
-                echo "🧹 Cleaning up temporary files..."
+                echo "Cleaning up temporary files..."
                 sh '''
                     rm -f kubeconfig.yaml
                     rm -f deployment-temp.yaml rbac-temp.yaml service-temp.yaml hpa-temp.yaml || true
