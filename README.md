@@ -11,6 +11,8 @@ A Flask-based REST API for retrieving YouTube video information with a complete 
 - 🔄 Automated CI/CD pipeline with Jenkins
 - 🛡️ Health and readiness probes
 - 📈 Horizontal Pod Autoscaler (HPA)
+- 🚀 Automatic build triggering on Git commits
+- 🌐 Multi-repository and multi-cluster support
 
 ## 📋 Requirements
 
@@ -62,6 +64,26 @@ This project includes a complete CI/CD pipeline implemented with Jenkins:
 - `DEPLOY_ENVIRONMENT` - Target environment (development, staging, production)
 - `RUN_TESTS` - Enable/disable unit tests
 - `SKIP_DEPLOYMENT` - Skip deployment for testing
+- `DOCKER_REGISTRY_OVERRIDE` - Override default Docker registry
+- `DOCKER_REPO_OVERRIDE` - Override default Docker repository
+- `NAMESPACE_OVERRIDE` - Override default Kubernetes namespace base name
+- `DEPLOYMENT_OVERRIDE` - Override default deployment name
+
+### Automatic Build Triggering
+
+The pipeline automatically triggers on Git push events. To set this up:
+
+1. In your Git repository settings, add a webhook:
+
+   - URL: `http://your-jenkins-url/github-webhook/`
+   - Content type: `application/json`
+   - Events: Push events
+
+2. For local development, use ngrok:
+   ```bash
+   ngrok http 8080
+   ```
+   Then use the provided URL as your webhook endpoint.
 
 ## 🐳 Docker Support
 

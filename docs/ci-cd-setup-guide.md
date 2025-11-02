@@ -29,6 +29,7 @@ Navigate to **Manage Jenkins > Manage Plugins** and install:
 - Kubernetes CLI Plugin
 - Pipeline Utility Steps Plugin
 - Credentials Binding Plugin
+- GitHub Plugin (for webhook support)
 
 ### 2. Configure Credentials
 
@@ -46,7 +47,7 @@ Go to **Manage Jenkins > Manage Credentials** and add:
    - ID: `kubeconfig-jenkins`
    - File: Upload your kubeconfig file
 
-### 3. Configure Webhook (Optional)
+### 3. Configure Webhook
 
 To enable automatic pipeline triggering on Git commits:
 
@@ -83,6 +84,10 @@ The pipeline supports the following parameters:
 - `DEPLOY_ENVIRONMENT`: Target environment (development, staging, production)
 - `RUN_TESTS`: Enable/disable unit tests
 - `SKIP_DEPLOYMENT`: Skip deployment for testing
+- `DOCKER_REGISTRY_OVERRIDE`: Override default Docker registry
+- `DOCKER_REPO_OVERRIDE`: Override default Docker repository
+- `NAMESPACE_OVERRIDE`: Override default Kubernetes namespace base name
+- `DEPLOYMENT_OVERRIDE`: Override default deployment name
 
 ## Kubernetes Setup
 
@@ -141,6 +146,8 @@ When properly configured with webhooks, the pipeline will automatically trigger 
 - Push events to the repository
 - Pull request merges
 
+The pipeline now includes a `triggers { githubPush() }` directive that enables automatic triggering.
+
 ## Environment-Specific Deployments
 
 The pipeline supports three environments:
@@ -150,6 +157,17 @@ The pipeline supports three environments:
 - **Production**: `youtube-app`
 
 Each environment gets its own namespace for isolation.
+
+## Multi-Repository and Multi-Cluster Support
+
+The enhanced pipeline now supports deployment to different repositories and clusters through override parameters:
+
+1. **Different Docker Registries**: Use `DOCKER_REGISTRY_OVERRIDE` parameter
+2. **Different Docker Repositories**: Use `DOCKER_REPO_OVERRIDE` parameter
+3. **Different Kubernetes Namespaces**: Use `NAMESPACE_OVERRIDE` parameter
+4. **Different Deployment Names**: Use `DEPLOYMENT_OVERRIDE` parameter
+
+This makes the pipeline scalable and adaptable to various deployment scenarios.
 
 ## Monitoring and Observability
 
@@ -178,8 +196,14 @@ The application exposes Prometheus metrics at `/metrics`:
    - Ensure RBAC permissions are applied
 
 3. **Test Failures**
+
    - Check PYTHONPATH includes app directory
    - Verify all dependencies are installed
+
+4. **Webhook Not Triggering**
+   - Verify webhook URL is correct
+   - Check Jenkins GitHub plugin is installed
+   - Ensure Jenkins is accessible from the internet (for GitHub.com)
 
 ### Logs and Diagnostics
 

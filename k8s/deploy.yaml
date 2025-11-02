@@ -43,3 +43,12 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1000m"
+          env:
+            - name: DEBUG
+              value: "false"
+            - name: MAX_DOWNLOAD_SIZE
+              value: "100"
+            - name: DOWNLOAD_FOLDER
+              value: "downloads"
+            - name: APP_VERSION
+              value: "1.0.0"

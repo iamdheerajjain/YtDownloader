@@ -1,18 +1,19 @@
 pipeline {
     agent any
 
+    // Add triggers for automatic build on Git push
+    triggers {
+        githubPush()
+    }
+
     environment {
-        // Docker image configuration
-        DOCKER_HUB_REPO = "prakuljain/yt-downloader"
+        // Make these configurable via parameters for scalability
+        DOCKER_REGISTRY = sh(script: "echo ${params.DOCKER_REGISTRY_OVERRIDE ?: 'docker.io'}", returnStdout: true).trim()
+        DOCKER_HUB_REPO = sh(script: "echo ${params.DOCKER_REPO_OVERRIDE ?: 'prakuljain/yt-downloader'}", returnStdout: true).trim()
+        NAMESPACE_BASE = sh(script: "echo ${params.NAMESPACE_OVERRIDE ?: 'youtube-app'}", returnStdout: true).trim()
+        DEPLOYMENT_NAME = sh(script: "echo ${params.DEPLOYMENT_OVERRIDE ?: 'youtube-api'}", returnStdout: true).trim()
         IMAGE_TAG = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
         LATEST_TAG = "latest"
-        
-        // Kubernetes configuration
-        NAMESPACE = "youtube-app"
-        DEPLOYMENT_NAME = "youtube-api"
-        
-        // Credentials (configured in Jenkins)
-        KUBECONFIG_CRED = credentials('kubeconfig-jenkins')
     }
 
     parameters {
@@ -31,6 +32,27 @@ pipeline {
             name: 'SKIP_DEPLOYMENT',
             defaultValue: false,
             description: 'Skip deployment stage (for testing only)'
+        )
+        // Add parameters for multi-repository support
+        string(
+            name: 'DOCKER_REGISTRY_OVERRIDE',
+            defaultValue: '',
+            description: 'Override default Docker registry (e.g., registry.example.com)'
+        )
+        string(
+            name: 'DOCKER_REPO_OVERRIDE',
+            defaultValue: '',
+            description: 'Override default Docker repository (e.g., yourname/your-app)'
+        )
+        string(
+            name: 'NAMESPACE_OVERRIDE',
+            defaultValue: '',
+            description: 'Override default Kubernetes namespace base name'
+        )
+        string(
+            name: 'DEPLOYMENT_OVERRIDE',
+            defaultValue: '',
+            description: 'Override default deployment name'
         )
     }
 
@@ -52,7 +74,7 @@ pipeline {
         stage('Code Quality Checks') {
             steps {
                 script {
-                    echo "🔍 Running code quality checks..."
+                    echo "Running code quality checks..."
                     sh '''
                         # Install quality checking tools
                         pip3 install flake8 bandit
@@ -132,7 +154,7 @@ pipeline {
                 stage('Docker Image Scan') {
                     steps {
                         script {
-                            echo "🛡️ Scanning Docker image for vulnerabilities..."
+                            echo "Scanning Docker image for vulnerabilities..."
                             sh '''
                                 # Use Trivy for container scanning if available
                                 if command -v trivy &> /dev/null; then
@@ -148,7 +170,7 @@ pipeline {
                 stage('Dependency Scan') {
                     steps {
                         script {
-                            echo "🛡️ Scanning dependencies for vulnerabilities..."
+                            echo "Scanning dependencies for vulnerabilities..."
                             sh '''
                                 # Install safety for dependency scanning
                                 pip3 install safety pip-audit
@@ -206,9 +228,9 @@ pipeline {
                     echo "Deploying to Kubernetes cluster..."
                     
                     // Set environment-specific configurations
-                    def targetNamespace = "${NAMESPACE}-${params.DEPLOY_ENVIRONMENT}"
+                    def targetNamespace = "${NAMESPACE_BASE}-${params.DEPLOY_ENVIRONMENT}"
                     if (params.DEPLOY_ENVIRONMENT == 'production') {
-                        targetNamespace = NAMESPACE  // Use base namespace for production
+                        targetNamespace = NAMESPACE_BASE  // Use base namespace for production
                     }
                     
                     echo "Deploying to namespace: ${targetNamespace}"
@@ -235,7 +257,7 @@ current-context: local-context
 users:
 - name: default
   user:
-    token: dummy-token  # Dummy token to prevent interactive prompts
+    token: dummy-token  // Dummy token to prevent interactive prompts
 EOL
                         
                         export KUBECONFIG=\${PWD}/kubeconfig.yaml
@@ -254,14 +276,14 @@ EOL
                         
                         echo "=== Applying RBAC ==="
                         if [ -f k8s/rbac.yaml ]; then
-                            # Update namespace in RBAC file
+                            // Update namespace in RBAC file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/rbac.yaml > rbac-temp.yaml
                             kubectl apply -f rbac-temp.yaml 2>&1 || echo "RBAC apply failed"
                         fi
                         
                         echo "=== Preparing deployment manifest ==="
                         if [ -f k8s/deploy.yaml ]; then
-                            # Update namespace and image in deployment file
+                            // Update namespace and image in deployment file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/deploy.yaml > deployment-temp.yaml
                             sed -i "s#prakuljain/yt-downloader:latest#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
                             
@@ -277,14 +299,14 @@ EOL
                         
                         echo "=== Applying service ==="
                         if [ -f k8s/service.yaml ]; then
-                            # Update namespace in service file
+                            // Update namespace in service file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/service.yaml > service-temp.yaml
                             kubectl apply -f service-temp.yaml 2>&1 || echo "Service apply failed"
                         fi
                         
                         echo "=== Applying HPA ==="
                         if [ -f k8s/hpa.yaml ]; then
-                            # Update namespace in HPA file
+                            // Update namespace in HPA file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/hpa.yaml > hpa-temp.yaml
                             kubectl apply -f hpa-temp.yaml 2>&1 || echo "HPA apply failed"
                         fi
@@ -302,28 +324,28 @@ EOL
             }
             steps {
                 script {
-                    echo "🩺 Performing health checks..."
+                    echo "Performing health checks..."
                     
-                    def targetNamespace = "${NAMESPACE}-${params.DEPLOY_ENVIRONMENT}"
+                    def targetNamespace = "${NAMESPACE_BASE}-${params.DEPLOY_ENVIRONMENT}"
                     if (params.DEPLOY_ENVIRONMENT == 'production') {
-                        targetNamespace = NAMESPACE
+                        targetNamespace = NAMESPACE_BASE
                     }
                     
                     sh """
                         export KUBECONFIG=\${PWD}/kubeconfig.yaml
                         
-                        # Check if pods are running
+                        // Check if pods are running
                         echo "=== Checking pod status ==="
                         kubectl get pods -n ${targetNamespace} -l app=youtube-api || echo "Failed to get pods"
                         
-                        # Check service endpoints
+                        // Check service endpoints
                         echo "=== Checking service endpoints ==="
                         kubectl get endpoints youtube-api -n ${targetNamespace} || echo "No endpoints found"
                         
-                        # Wait a bit for application to be ready
+                        // Wait a bit for application to be ready
                         sleep 10
                         
-                        # Try to access the application (if service is exposed)
+                        // Try to access the application (if service is exposed)
                         echo "=== Checking application readiness ==="
                         kubectl get service youtube-api -n ${targetNamespace} -o wide || echo "Failed to get service info"
                     """
@@ -337,7 +359,7 @@ EOL
             script {
                 echo "Pipeline completed successfully!"
                 echo "Docker image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
-                echo "Deployed to namespace: ${NAMESPACE}-${params.DEPLOY_ENVIRONMENT}"
+                echo "Deployed to namespace: ${NAMESPACE_BASE}-${params.DEPLOY_ENVIRONMENT}"
                 
                 // Send notification (configure as needed)
                 /*
