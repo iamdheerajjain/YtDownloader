@@ -257,7 +257,7 @@ current-context: local-context
 users:
 - name: default
   user:
-    token: dummy-token  // Dummy token to prevent interactive prompts
+    token: dummy-token  # Dummy token to prevent interactive prompts
 EOL
                         
                         export KUBECONFIG=\${PWD}/kubeconfig.yaml
@@ -276,14 +276,14 @@ EOL
                         
                         echo "=== Applying RBAC ==="
                         if [ -f k8s/rbac.yaml ]; then
-                            // Update namespace in RBAC file
+                            # Update namespace in RBAC file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/rbac.yaml > rbac-temp.yaml
                             kubectl apply -f rbac-temp.yaml 2>&1 || echo "RBAC apply failed"
                         fi
                         
                         echo "=== Preparing deployment manifest ==="
                         if [ -f k8s/deploy.yaml ]; then
-                            // Update namespace and image in deployment file
+                            # Update namespace and image in deployment file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/deploy.yaml > deployment-temp.yaml
                             sed -i "s#prakuljain/yt-downloader:latest#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
                             
@@ -299,14 +299,14 @@ EOL
                         
                         echo "=== Applying service ==="
                         if [ -f k8s/service.yaml ]; then
-                            // Update namespace in service file
+                            # Update namespace in service file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/service.yaml > service-temp.yaml
                             kubectl apply -f service-temp.yaml 2>&1 || echo "Service apply failed"
                         fi
                         
                         echo "=== Applying HPA ==="
                         if [ -f k8s/hpa.yaml ]; then
-                            // Update namespace in HPA file
+                            # Update namespace in HPA file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/hpa.yaml > hpa-temp.yaml
                             kubectl apply -f hpa-temp.yaml 2>&1 || echo "HPA apply failed"
                         fi
@@ -334,18 +334,18 @@ EOL
                     sh """
                         export KUBECONFIG=\${PWD}/kubeconfig.yaml
                         
-                        // Check if pods are running
+                        # Check if pods are running
                         echo "=== Checking pod status ==="
                         kubectl get pods -n ${targetNamespace} -l app=youtube-api || echo "Failed to get pods"
                         
-                        // Check service endpoints
+                        # Check service endpoints
                         echo "=== Checking service endpoints ==="
                         kubectl get endpoints youtube-api -n ${targetNamespace} || echo "No endpoints found"
                         
-                        // Wait a bit for application to be ready
+                        # Wait a bit for application to be ready
                         sleep 10
                         
-                        // Try to access the application (if service is exposed)
+                        # Try to access the application (if service is exposed)
                         echo "=== Checking application readiness ==="
                         kubectl get service youtube-api -n ${targetNamespace} -o wide || echo "Failed to get service info"
                     """
