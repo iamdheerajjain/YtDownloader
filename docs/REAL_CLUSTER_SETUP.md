@@ -131,34 +131,58 @@ kubectl cluster-info
 kubectl auth can-i create deployments --namespace youtube-app
 ```
 
-## Troubleshooting
-
-### Common Issues:
-
-1. **Certificate errors**: Ensure your certificate authority data is correct
-2. **Authentication failures**: Verify your token/certificates are valid and not expired
-3. **Permission denied**: Check that your service account has proper RBAC permissions
-4. **Network connectivity**: Ensure your Jenkins server can reach the Kubernetes API endpoint
-
-### Debug Commands:
-
-```bash
-# Check current context
-kubectl config current-context
-
-# View cluster information
-kubectl cluster-info
-
-# Test permissions
-kubectl auth can-i list pods --namespace youtube-app
-
-# Check if namespace exists
-kubectl get namespaces
-```
-
 ## Security Considerations
 
-1. Store your kubeconfig securely and never commit real credentials to version control
-2. Use dedicated service accounts with minimal required permissions
-3. Rotate authentication tokens regularly
-4. Consider using Kubernetes secrets for sensitive application configuration
+1. Never commit real authentication tokens or certificates to version control
+2. Store your kubeconfig file securely
+3. Use dedicated service accounts with minimal required permissions
+4. Rotate authentication tokens regularly
+
+## Token Expiration
+
+⚠️ **Important**: Kubernetes service account tokens may expire after 24 hours, depending on your cluster configuration. If your token expires, you'll need to generate a new one.
+
+### Steps to Renew Expired Tokens
+
+1. **Generate a new token** using the provided script:
+
+   ```bash
+   ./scripts/generate-token.sh
+   ```
+
+2. **Update your kubeconfig** with the new token:
+
+   - Replace the token value in `kubeconfig-jenkins.yaml` under `users[0].user.token`
+   - Or use the automated approach by running the script with the kubeconfig file path:
+
+   ```bash
+   ./scripts/generate-token.sh youtube-app jenkins-sa
+   ```
+
+3. **Verify the updated configuration**:
+
+   ```bash
+   ./scripts/validate-kubeconfig.sh
+   ```
+
+4. **Test connectivity**:
+   ```bash
+   kubectl --kubeconfig=kubeconfig-jenkins.yaml get pods -n youtube-app
+   ```
+
+### Automated Token Renewal
+
+For production environments, consider implementing an automated token renewal process:
+
+- Set up a cron job to regenerate tokens periodically
+- Use Kubernetes secrets to store tokens securely
+- Implement a notification system for token renewal events
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Check that your cluster endpoint is reachable from your Jenkins server
+2. Verify that your authentication token is valid and not expired
+3. Ensure your service account has proper RBAC permissions
+4. Use the validation script to check your kubeconfig structure
