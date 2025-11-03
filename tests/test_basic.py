@@ -2,7 +2,6 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 
-# Add the app directory to the Python path
 app_path = os.path.join(os.path.dirname(__file__), '..', 'app')
 sys.path.insert(0, app_path)
 
@@ -50,8 +49,7 @@ def test_ready_endpoint():
 def test_info_endpoint(mock_ytdl):
     """Test the video info endpoint"""
     import main
-    
-    # Mock the YouTubeDL response
+
     mock_instance = MagicMock()
     mock_instance.extract_info.return_value = {
         'title': 'Test Video',
@@ -67,15 +65,13 @@ def test_info_endpoint(mock_ytdl):
     
     main.app.config['TESTING'] = True
     client = main.app.test_client()
-    
-    # Test with valid data
+
     response = client.post('/info', json={'url': 'https://youtube.com/watch?v=test'})
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'success'
     assert data['video']['title'] == 'Test Video'
-    
-    # Test with missing URL
+
     response = client.post('/info', json={})
     assert response.status_code == 400
 
@@ -83,8 +79,7 @@ def test_info_endpoint(mock_ytdl):
 def test_download_endpoint(mock_ytdl):
     """Test the download endpoint"""
     import main
-    
-    # Mock the YouTubeDL response
+
     mock_instance = MagicMock()
     mock_instance.extract_info.return_value = {
         'title': 'Test Video',
@@ -98,14 +93,12 @@ def test_download_endpoint(mock_ytdl):
     
     main.app.config['TESTING'] = True
     client = main.app.test_client()
-    
-    # Test with valid data
+
     response = client.post('/download', json={'url': 'https://youtube.com/watch?v=test'})
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'success'
     assert data['video']['title'] == 'Test Video'
-    
-    # Test with missing URL
+
     response = client.post('/download', json={})
     assert response.status_code == 400

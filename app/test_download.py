@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test script to demonstrate downloading YouTube videos and playlists
 using the YouTube Downloader API.
@@ -21,16 +20,13 @@ def download_content(api_url, content_url, quality='720p'):
     Returns:
         dict: The API response
     """
-    # Endpoint for downloading
     download_endpoint = f"{api_url}/download"
-    
-    # Prepare the payload
+
     payload = {
         "url": content_url,
         "quality": quality
     }
-    
-    # Set headers
+
     headers = {
         "Content-Type": "application/json"
     }
@@ -38,16 +34,14 @@ def download_content(api_url, content_url, quality='720p'):
     try:
         print(f"Sending download request for: {content_url}")
         print(f"Quality: {quality}")
-        
-        # Make the POST request
+
         response = requests.post(
             download_endpoint, 
             data=json.dumps(payload), 
             headers=headers,
-            timeout=300  # 5 minute timeout
+            timeout=300
         )
-        
-        # Return the response
+
         return {
             'status_code': response.status_code,
             'response': response.json() if response.content else {}
@@ -70,12 +64,10 @@ def download_content(api_url, content_url, quality='720p'):
         }
 
 def main():
-    # Default values
     api_url = "http://localhost:2000"
     content_url = None
     quality = "720p"
-    
-    # Parse command line arguments
+
     if len(sys.argv) < 2:
         print("Usage: python test_download.py <youtube_url> [api_url] [quality]")
         print("Example: python test_download.py 'https://www.youtube.com/watch?v=example'")
@@ -96,16 +88,13 @@ def main():
     print(f"Content URL: {content_url}")
     print(f"Quality: {quality}")
     print("=" * 40)
-    
-    # Make the download request
+
     result = download_content(api_url, content_url, quality)
-    
-    # Display results
+
     print(f"\nResponse Status: {result['status_code']}")
     print("Response Data:")
     print(json.dumps(result['response'], indent=2))
-    
-    # Check if successful
+
     if result['status_code'] == 200 and result['response'].get('status') == 'success':
         print("\n✓ Download request completed successfully!")
         if result['response'].get('type') == 'playlist':
