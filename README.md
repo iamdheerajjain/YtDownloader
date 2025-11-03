@@ -39,10 +39,10 @@ A Flask-based REST API for retrieving YouTube video information with a complete 
    ```
 
 3. **Access the API:**
-   - API Root: http://localhost:8080/
-   - Health Check: http://localhost:8080/health
-   - Readiness Check: http://localhost:8080/ready
-   - Metrics: http://localhost:8080/metrics
+   - API Root: http://localhost:2000/
+   - Health Check: http://localhost:2000/health
+   - Readiness Check: http://localhost:2000/ready
+   - Metrics: http://localhost:2000/metrics
 
 ## 🏗️ CI/CD Pipeline
 
@@ -81,7 +81,7 @@ The pipeline automatically triggers on Git push events. To set this up:
 
 2. For local development, use ngrok:
    ```bash
-   ngrok http 8080
+   ngrok http 2000
    ```
    Then use the provided URL as your webhook endpoint.
 
@@ -94,7 +94,7 @@ The application is containerized using a multi-stage Dockerfile:
 docker build -t yt-downloader .
 
 # Run the container
-docker run -p 8080:8080 yt-downloader
+docker run -p 2000:8080 yt-downloader
 ```
 
 ## ☸️ Kubernetes Deployment
@@ -125,27 +125,6 @@ By default, the project uses a placeholder kubeconfig for demonstration purposes
 2. Update `kubeconfig-jenkins.yaml` with your actual cluster endpoint and authentication credentials
 3. Ensure your Jenkins server can reach the Kubernetes API endpoint
 4. Configure proper RBAC permissions for the Jenkins service account
-
-### Token Expiration and Renewal
-
-⚠️ **Important**: Kubernetes service account tokens may expire after 24 hours, depending on your cluster configuration.
-
-#### Steps to Renew Expired Tokens
-
-1. **Generate a new token** using the provided script:
-   ```bash
-   ./scripts/generate-token.sh
-   ```
-
-2. **Update your kubeconfig** with the new token:
-   - Replace the token value in `kubeconfig-jenkins.yaml` under `users[0].user.token`
-
-3. **Verify the updated configuration**:
-   ```bash
-   ./scripts/validate-kubeconfig.sh
-   ```
-
-For more detailed information about token expiration and renewal, refer to [REAL_CLUSTER_SETUP.md](REAL_CLUSTER_SETUP.md).
 
 ## 🧪 Testing
 
@@ -199,4 +178,3 @@ Detailed documentation is available in the [docs](docs/) directory:
 - [CI/CD Setup Guide](docs/ci-cd-setup-guide.md) - Complete setup instructions
 - [Test Plan](docs/test-plan.md) - Validation procedures
 - [Monitoring & Logging](docs/monitoring-logging.md) - Observability strategy
-
