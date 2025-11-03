@@ -10,29 +10,6 @@ This guide explains how to configure the project to deploy to a real Kubernetes 
 
 ## Step 1: Obtain Your Cluster Information
 
-### For Cloud Providers:
-
-#### AWS EKS:
-
-1. Go to AWS Console → EKS → Your cluster
-2. Note the API server endpoint
-3. Download/update your kubeconfig with: `aws eks update-kubeconfig --name your-cluster-name`
-
-#### Google GKE:
-
-1. Go to Google Cloud Console → Kubernetes Engine → Clusters
-2. Click on your cluster
-3. Note the Endpoint URL
-4. Get credentials with: `gcloud container clusters get-credentials your-cluster-name --zone=your-zone --project=your-project`
-
-#### Azure AKS:
-
-1. Go to Azure Portal → Kubernetes Services → Your cluster
-2. Note the API server address
-3. Get credentials with: `az aks get-credentials --resource-group your-resource-group --name your-cluster-name`
-
-### For Local Clusters:
-
 #### Minikube:
 
 1. Start minikube: `minikube start`

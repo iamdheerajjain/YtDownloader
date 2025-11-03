@@ -126,6 +126,27 @@ By default, the project uses a placeholder kubeconfig for demonstration purposes
 3. Ensure your Jenkins server can reach the Kubernetes API endpoint
 4. Configure proper RBAC permissions for the Jenkins service account
 
+### Token Expiration and Renewal
+
+⚠️ **Important**: Kubernetes service account tokens may expire after 24 hours, depending on your cluster configuration.
+
+#### Steps to Renew Expired Tokens
+
+1. **Generate a new token** using the provided script:
+   ```bash
+   ./scripts/generate-token.sh
+   ```
+
+2. **Update your kubeconfig** with the new token:
+   - Replace the token value in `kubeconfig-jenkins.yaml` under `users[0].user.token`
+
+3. **Verify the updated configuration**:
+   ```bash
+   ./scripts/validate-kubeconfig.sh
+   ```
+
+For more detailed information about token expiration and renewal, refer to [REAL_CLUSTER_SETUP.md](REAL_CLUSTER_SETUP.md).
+
 ## 🧪 Testing
 
 Run unit tests with pytest:
