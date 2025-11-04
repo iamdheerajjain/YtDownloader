@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
-MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))  # MB
+MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))
 DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 

@@ -86,7 +86,7 @@ def test_download_endpoint(mock_ytdl):
         'duration': 300,
         'uploader': 'Test Uploader',
         'view_count': 1000,
-        'filesize': 5000000,  # ~5MB
+        'filesize': 5000000,
         'ext': 'mp4'
     }
     mock_ytdl.return_value.__enter__.return_value = mock_instance

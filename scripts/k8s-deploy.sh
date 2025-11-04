@@ -1,4 +1,3 @@
-#!/bin/bash
 set -euo pipefail
 
 KUBECONFIG_FILE="$1"
@@ -13,13 +12,10 @@ echo "Namespace: $NAMESPACE"
 echo "Deployment: $DEPLOYMENT"
 echo "Image: $IMAGE"
 
-# Create namespace if it doesn't exist
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-# Apply RBAC
 kubectl -n "$NAMESPACE" apply -f k8s/rbac.yaml || true
 
-# Check if deployment exists and update or create
 if kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" >/dev/null 2>&1; then
   echo "Updating existing deployment..."
   kubectl -n "$NAMESPACE" set image deployment/"$DEPLOYMENT" "$DEPLOYMENT"="${IMAGE}"

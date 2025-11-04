@@ -1,13 +1,11 @@
 pipeline {
     agent any
 
-    // Add triggers for automatic build on Git push
     triggers {
         githubPush()
     }
 
     environment {
-        // Make these configurable via parameters for scalability
         DOCKER_REGISTRY = sh(script: "echo ${params.DOCKER_REGISTRY_OVERRIDE ?: 'docker.io'}", returnStdout: true).trim()
         DOCKER_HUB_REPO = sh(script: "echo ${params.DOCKER_REPO_OVERRIDE ?: 'prakuljain/yt-downloader'}", returnStdout: true).trim()
         NAMESPACE_BASE = sh(script: "echo ${params.NAMESPACE_OVERRIDE ?: 'youtube-app'}", returnStdout: true).trim()
@@ -17,7 +15,6 @@ pipeline {
     }
 
     parameters {
-        // Allow manual triggering with different configurations
         choice(
             name: 'DEPLOY_ENVIRONMENT',
             choices: ['development', 'staging', 'production'],
@@ -33,7 +30,6 @@ pipeline {
             defaultValue: false,
             description: 'Skip deployment stage (for testing only)'
         )
-        // Add parameters for multi-repository support
         string(
             name: 'DOCKER_REGISTRY_OVERRIDE',
             defaultValue: '',
@@ -62,8 +58,6 @@ pipeline {
                 script {
                     echo "Checking out code from Git repository..."
                     checkout scm
-                    
-                    // Display Git information
                     echo "Repository: ${env.GIT_URL}"
                     echo "Branch: ${env.GIT_BRANCH}"
                     echo "Commit: ${GIT_COMMIT}"
@@ -226,16 +220,14 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to Kubernetes cluster..."
-                    
-                    // Set environment-specific configurations
+
                     def targetNamespace = "${NAMESPACE_BASE}-${params.DEPLOY_ENVIRONMENT}"
                     if (params.DEPLOY_ENVIRONMENT == 'production') {
-                        targetNamespace = NAMESPACE_BASE  // Use base namespace for production
+                        targetNamespace = NAMESPACE_BASE
                     }
                     
                     echo "Deploying to namespace: ${targetNamespace}"
-                    
-                    // Use the real kubeconfig file
+
                     sh """
                         export KUBECONFIG=\${PWD}/kubeconfig-jenkins.yaml
                         
@@ -337,8 +329,6 @@ pipeline {
                 echo "Pipeline completed successfully!"
                 echo "Docker image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}"
                 echo "Deployed to namespace: ${NAMESPACE_BASE}-${params.DEPLOY_ENVIRONMENT}"
-                
-                // Send notification (configure as needed)
                 /*
                 slackSend(
                     channel: '#jenkins',
@@ -350,8 +340,6 @@ pipeline {
         failure {
             script {
                 echo "Pipeline failed. Check the logs above for details."
-                
-                // Send notification (configure as needed)
                 /*
                 slackSend(
                     channel: '#jenkins',
