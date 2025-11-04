@@ -167,7 +167,7 @@ pipeline {
                             sh '''
                                 # Use Trivy for container scanning if available
                                 if command -v trivy &> /dev/null; then
-                                    trivy image --exit-code 0 --severity HIGH,CRITICAL ${DOCKER_HUB_REPO}:${IMAGE_TAG} || echo "Trivy scan completed with findings"
+                                    trivy image --exit-code 0 --severity HIGH,CRITICAL ${DOCKER_HUB_REPO}:${IMAGE_TAG}
                                 else
                                     echo "Trivy not available, skipping Docker image scan"
                                     echo "Install Trivy to enable container vulnerability scanning"
@@ -187,21 +187,28 @@ pipeline {
                                 # Add local bin to PATH
                                 export PATH=$PATH:/var/lib/jenkins/.local/bin:$HOME/.local/bin
                                 
-                                # Run safety check without interactive prompts
+                                # Run safety check
                                 echo "Running safety dependency check..."
-                                safety scan -r app/requirements.txt --disable-telemetry --quiet || echo "safety scan completed"
+                                safety scan -r app/requirements.txt
+                                SAFETY_EXIT_CODE=$?
+                                if [ $SAFETY_EXIT_CODE -ne 0 ]; then
+                                    echo "Safety scan found vulnerabilities with exit code $SAFETY_EXIT_CODE"
+                                    # Continue with pipeline even if vulnerabilities found
+                                fi
+                                echo "safety scan completed"
                                 
                                 # Run pip-audit
                                 echo "Running pip-audit dependency check..."
-                                pip-audit -r app/requirements.txt || echo "pip-audit completed"
+                                pip-audit -r app/requirements.txt
+                                PIP_AUDIT_EXIT_CODE=$?
+                                if [ $PIP_AUDIT_EXIT_CODE -ne 0 ]; then
+                                    echo "pip-audit found vulnerabilities with exit code $PIP_AUDIT_EXIT_CODE"
+                                    # Continue with pipeline even if vulnerabilities found
+                                fi
+                                echo "pip-audit completed"
                             '''
                         }
                     }
-                }
-            }
-            post {
-                always {
-                    echo "Security scan stage completed (continuing pipeline even if vulnerabilities found)"
                 }
             }
         }
