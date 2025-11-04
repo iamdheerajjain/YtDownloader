@@ -127,8 +127,23 @@ pipeline {
                         # Add local bin to PATH for any tools that might be needed
                         export PATH=\$PATH:/var/lib/jenkins/.local/bin:\$HOME/.local/bin
                         
+                        echo "Building image ${DOCKER_HUB_REPO}:${IMAGE_TAG}..."
                         docker build -t ${DOCKER_HUB_REPO}:${IMAGE_TAG} .
+                        BUILD_STATUS=\$?
+                        if [ \$BUILD_STATUS -ne 0 ]; then
+                            echo "ERROR: Docker build failed with exit code \$BUILD_STATUS"
+                            exit 1
+                        fi
+                        
+                        echo "Tagging image as ${DOCKER_HUB_REPO}:${LATEST_TAG}..."
                         docker tag ${DOCKER_HUB_REPO}:${IMAGE_TAG} ${DOCKER_HUB_REPO}:${LATEST_TAG}
+                        TAG_STATUS=\$?
+                        if [ \$TAG_STATUS -ne 0 ]; then
+                            echo "ERROR: Docker tag failed with exit code \$TAG_STATUS"
+                            exit 1
+                        fi
+                        
+                        echo "Docker build and tag completed successfully"
                     """
                 }
             }
@@ -174,11 +189,23 @@ pipeline {
                                 
                                 # Run safety check
                                 echo "Running safety dependency check..."
-                                safety scan -r app/requirements.txt || echo "safety scan completed"
+                                safety scan -r app/requirements.txt
+                                SAFETY_EXIT_CODE=$?
+                                if [ $SAFETY_EXIT_CODE -ne 0 ]; then
+                                    echo "Safety scan found vulnerabilities with exit code $SAFETY_EXIT_CODE"
+                                    # Continue with pipeline even if vulnerabilities found
+                                fi
+                                echo "safety scan completed"
                                 
                                 # Run pip-audit
                                 echo "Running pip-audit dependency check..."
-                                pip-audit -r app/requirements.txt || echo "pip-audit completed"
+                                pip-audit -r app/requirements.txt
+                                PIP_AUDIT_EXIT_CODE=$?
+                                if [ $PIP_AUDIT_EXIT_CODE -ne 0 ]; then
+                                    echo "pip-audit found vulnerabilities with exit code $PIP_AUDIT_EXIT_CODE"
+                                    # Continue with pipeline even if vulnerabilities found
+                                fi
+                                echo "pip-audit completed"
                             '''
                         }
                     }
@@ -191,15 +218,58 @@ pipeline {
                 script {
                     echo "Pushing image to Docker registry..."
                     withCredentials([usernamePassword(credentialsId: 'docker-registry', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh """
+                        sh '''
                             # Add local bin to PATH
-                            export PATH=\$PATH:/var/lib/jenkins/.local/bin:\$HOME/.local/bin
+                            export PATH=$PATH:/var/lib/jenkins/.local/bin:$HOME/.local/bin
                             
-                            echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
+                            # Validate that credentials are not empty
+                            if [ -z "$DOCKER_USER" ] || [ -z "$DOCKER_PASS" ]; then
+                                echo "ERROR: Docker credentials are not properly configured"
+                                echo "DOCKER_USER: ${DOCKER_USER}"
+                                echo "DOCKER_PASS length: ${#DOCKER_PASS}"
+                                exit 1
+                            fi
+                            
+                            echo "Attempting to login to Docker Hub as user: $DOCKER_USER"
+                            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+                            LOGIN_STATUS=$?
+                            if [ $LOGIN_STATUS -ne 0 ]; then
+                                echo "ERROR: Docker login failed with exit code $LOGIN_STATUS"
+                                echo "Please check your Docker Hub credentials in Jenkins"
+                                exit 1
+                            fi
+                            
+                            echo "Verifying that image exists locally before pushing..."
+                            docker images ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                            IMAGE_EXISTS=$?
+                            if [ $IMAGE_EXISTS -ne 0 ]; then
+                                echo "ERROR: Image ${DOCKER_HUB_REPO}:${IMAGE_TAG} not found locally"
+                                echo "Available images:"
+                                docker images | head -10
+                                exit 1
+                            fi
+                            
+                            echo "Pushing image ${DOCKER_HUB_REPO}:${IMAGE_TAG}..."
                             docker push ${DOCKER_HUB_REPO}:${IMAGE_TAG}
+                            PUSH_STATUS=$?
+                            if [ $PUSH_STATUS -ne 0 ]; then
+                                echo "ERROR: Docker push failed with exit code $PUSH_STATUS"
+                                echo "Listing local images:"
+                                docker images | grep ${DOCKER_HUB_REPO} || echo "No matching images found"
+                                exit 1
+                            fi
+                            
+                            echo "Pushing image ${DOCKER_HUB_REPO}:${LATEST_TAG}..."
                             docker push ${DOCKER_HUB_REPO}:${LATEST_TAG}
+                            PUSH_LATEST_STATUS=$?
+                            if [ $PUSH_LATEST_STATUS -ne 0 ]; then
+                                echo "ERROR: Docker push of latest tag failed with exit code $PUSH_LATEST_STATUS"
+                                exit 1
+                            fi
+                            
                             docker logout
-                        """
+                            echo "Successfully pushed both tags to Docker Hub"
+                        '''
                     }
                 }
             }
@@ -228,26 +298,58 @@ pipeline {
                     
                     echo "Deploying to namespace: ${targetNamespace}"
 
-                    sh """
-                        export KUBECONFIG=\${PWD}/kubeconfig-jenkins.yaml
+                    sh '''
+                        export KUBECONFIG=${PWD}/kubeconfig-jenkins.yaml
                         
                         echo "=== Kubectl Version ==="
-                        kubectl version --client --output=yaml || echo "kubectl version check failed"
+                        kubectl version --client --output=yaml
+                        KUBECTL_VERSION_STATUS=$?
+                        if [ $KUBECTL_VERSION_STATUS -ne 0 ]; then
+                            echo "WARNING: kubectl version check failed with exit code $KUBECTL_VERSION_STATUS"
+                        fi
                         
                         echo "=== Cluster Info ==="
-                        kubectl cluster-info || echo "Cluster unreachable"
+                        kubectl cluster-info
+                        CLUSTER_INFO_STATUS=$?
+                        if [ $CLUSTER_INFO_STATUS -ne 0 ]; then
+                            echo "ERROR: Cannot reach cluster - kubectl cluster-info failed with exit code $CLUSTER_INFO_STATUS"
+                            echo "Current KUBECONFIG: $KUBECONFIG"
+                            echo "File exists: $(test -f $KUBECONFIG && echo "YES" || echo "NO")"
+                            if [ -f "$KUBECONFIG" ]; then
+                                echo "Kubeconfig contents:"
+                                cat $KUBECONFIG
+                            fi
+                            exit 1
+                        fi
                         
                         echo "=== Current Context ==="
-                        kubectl config current-context || echo "No context"
+                        kubectl config current-context
+                        CONTEXT_STATUS=$?
+                        if [ $CONTEXT_STATUS -ne 0 ]; then
+                            echo "ERROR: No valid context found - kubectl config current-context failed with exit code $CONTEXT_STATUS"
+                            exit 1
+                        fi
                         
                         echo "=== Creating namespace ${targetNamespace} ==="
-                        kubectl create namespace ${targetNamespace} 2>&1 || kubectl get namespace ${targetNamespace} || echo "Namespace operation failed"
+                        kubectl create namespace ${targetNamespace} 2>/dev/null || kubectl get namespace ${targetNamespace} >/dev/null
+                        NAMESPACE_STATUS=$?
+                        if [ $NAMESPACE_STATUS -ne 0 ]; then
+                            echo "ERROR: Failed to create or verify namespace ${targetNamespace}"
+                            exit 1
+                        fi
                         
                         echo "=== Applying RBAC ==="
                         if [ -f k8s/rbac.yaml ]; then
                             # Update namespace in RBAC file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/rbac.yaml > rbac-temp.yaml
-                            kubectl apply -f rbac-temp.yaml 2>&1 || echo "RBAC apply failed"
+                            kubectl apply -f rbac-temp.yaml
+                            RBAC_STATUS=$?
+                            if [ $RBAC_STATUS -ne 0 ]; then
+                                echo "ERROR: RBAC apply failed with exit code $RBAC_STATUS"
+                                exit 1
+                            fi
+                        else
+                            echo "WARNING: k8s/rbac.yaml not found, skipping RBAC configuration"
                         fi
                         
                         echo "=== Preparing deployment manifest ==="
@@ -257,32 +359,60 @@ pipeline {
                             sed -i "s#prakuljain/yt-downloader:latest#${DOCKER_HUB_REPO}:${IMAGE_TAG}#g" deployment-temp.yaml
                             
                             echo "=== Applying deployment ==="
-                            kubectl apply -f deployment-temp.yaml 2>&1 || echo "Deployment apply failed"
+                            kubectl apply -f deployment-temp.yaml
+                            DEPLOY_STATUS=$?
+                            if [ $DEPLOY_STATUS -ne 0 ]; then
+                                echo "ERROR: Deployment apply failed with exit code $DEPLOY_STATUS"
+                                exit 1
+                            fi
                             
                             echo "=== Checking rollout status ==="
-                            kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${targetNamespace} --timeout=120s 2>&1 || echo "Rollout status check failed"
+                            kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${targetNamespace} --timeout=120s
+                            ROLLOUT_STATUS=$?
+                            if [ $ROLLOUT_STATUS -ne 0 ]; then
+                                echo "ERROR: Rollout status check failed with exit code $ROLLOUT_STATUS"
+                                kubectl get pods -n ${targetNamespace}
+                                kubectl describe deployment/${DEPLOYMENT_NAME} -n ${targetNamespace}
+                                exit 1
+                            fi
                         else
                             echo "ERROR: k8s/deploy.yaml not found!"
                             ls -la k8s/ || echo "k8s directory not found"
+                            exit 1
                         fi
                         
                         echo "=== Applying service ==="
                         if [ -f k8s/service.yaml ]; then
                             # Update namespace in service file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/service.yaml > service-temp.yaml
-                            kubectl apply -f service-temp.yaml 2>&1 || echo "Service apply failed"
+                            kubectl apply -f service-temp.yaml
+                            SERVICE_STATUS=$?
+                            if [ $SERVICE_STATUS -ne 0 ]; then
+                                echo "ERROR: Service apply failed with exit code $SERVICE_STATUS"
+                                exit 1
+                            fi
+                        else
+                            echo "WARNING: k8s/service.yaml not found, skipping service configuration"
                         fi
                         
                         echo "=== Applying HPA ==="
                         if [ -f k8s/hpa.yaml ]; then
                             # Update namespace in HPA file
                             sed "s/youtube-app/${targetNamespace}/g" k8s/hpa.yaml > hpa-temp.yaml
-                            kubectl apply -f hpa-temp.yaml --validate=false 2>&1 || echo "HPA apply failed (may be due to cluster connectivity)"
+                            kubectl apply -f hpa-temp.yaml --validate=false
+                            HPA_STATUS=$?
+                            if [ $HPA_STATUS -ne 0 ]; then
+                                echo "ERROR: HPA apply failed with exit code $HPA_STATUS"
+                                exit 1
+                            fi
+                        else
+                            echo "WARNING: k8s/hpa.yaml not found, skipping HPA configuration"
                         fi
                         
                         echo "=== Final Status ==="
-                        kubectl get all -n ${targetNamespace} 2>&1 || echo "Failed to get resources"
-                    """
+                        kubectl get all -n ${targetNamespace}
+                        echo "Deployment completed successfully"
+                    '''
                 }
             }
         }

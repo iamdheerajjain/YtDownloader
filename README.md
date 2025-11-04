@@ -121,10 +121,48 @@ kubectl apply -f k8s/
 
 By default, the project uses a placeholder kubeconfig for demonstration purposes. To deploy to a real Kubernetes cluster:
 
-1. Follow the detailed instructions in [REAL_CLUSTER_SETUP.md](REAL_CLUSTER_SETUP.md)
+1. Follow the detailed instructions in [REAL_CLUSTER_SETUP.md](docs/REAL_CLUSTER_SETUP.md)
 2. Update `kubeconfig-jenkins.yaml` with your actual cluster endpoint and authentication credentials
 3. Ensure your Jenkins server can reach the Kubernetes API endpoint
 4. Configure proper RBAC permissions for the Jenkins service account
+
+### Troubleshooting Kubernetes Deployment
+
+If you encounter issues with Kubernetes deployment:
+
+1. Run the diagnostic script:
+
+   ```bash
+   ./scripts/diagnose-k8s-connectivity.sh
+   ```
+
+2. Check that the server endpoint in `kubeconfig-jenkins.yaml` points to your actual cluster, not localhost
+
+3. Verify that the authentication token is valid and not expired
+
+## 🔐 Docker Hub Configuration
+
+To successfully push Docker images to Docker Hub:
+
+1. In Jenkins, go to "Manage Jenkins" → "Manage Credentials"
+2. Add credentials with ID `docker-registry`
+3. Set username to your Docker Hub username
+4. Set password to your Docker Hub access token (not your password)
+5. Ensure the repository name in the Jenkinsfile matches your Docker Hub repository
+
+### Troubleshooting Docker Push Issues
+
+If you encounter issues with Docker image pushing:
+
+1. Validate your Docker Hub credentials:
+
+   ```bash
+   ./scripts/validate-docker-credentials.sh YOUR_DOCKER_USERNAME YOUR_DOCKER_ACCESS_TOKEN
+   ```
+
+2. Check that your Docker Hub repository exists and you have push permissions
+
+3. Verify network connectivity from Jenkins to Docker Hub
 
 ## 🧪 Testing
 
@@ -178,3 +216,14 @@ Detailed documentation is available in the [docs](docs/) directory:
 - [CI/CD Setup Guide](docs/ci-cd-setup-guide.md) - Complete setup instructions
 - [Test Plan](docs/test-plan.md) - Validation procedures
 - [Monitoring & Logging](docs/monitoring-logging.md) - Observability strategy
+
+## 🛠️ Recent Fixes and Improvements
+
+This project has been updated to address several common issues:
+
+1. **Security Vulnerabilities**: Dependencies have been updated to address known vulnerabilities
+2. **Improved Error Handling**: Enhanced error reporting in the Jenkins pipeline for better debugging
+3. **Diagnostic Scripts**: Added helper scripts to validate Docker and Kubernetes configurations
+4. **Better Logging**: More detailed logging throughout the pipeline for easier troubleshooting
+
+For a complete list of fixes, see [FIXES_SUMMARY.md](FIXES_SUMMARY.md)
