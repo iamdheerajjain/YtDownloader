@@ -35,7 +35,7 @@ A Flask-based REST API for retrieving YouTube video information with a complete 
 
    ```bash
    pip install -r app/requirements.txt
-   python app/main.py
+   DOWNLOAD_FOLDER=/downloads python app/main.py
    ```
 
 3. **Access the API:**
@@ -43,6 +43,10 @@ A Flask-based REST API for retrieving YouTube video information with a complete 
    - Health Check: http://localhost:2000/health
    - Readiness Check: http://localhost:2000/ready
    - Metrics: http://localhost:2000/metrics
+
+## Download Location
+
+Downloads are now stored in the `/downloads` directory at the root level, not within the app folder. This ensures that downloaded files are kept separate from the application code.
 
 ## 🏗️ CI/CD Pipeline
 

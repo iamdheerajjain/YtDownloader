@@ -4,6 +4,8 @@ from prometheus_client import Counter, Histogram, generate_latest, Gauge, REGIST
 import os
 import time
 import logging
+from typing import Dict, Any, Optional
+from yt_dlp import YoutubeDL as YDLP
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,7 +17,13 @@ app = Flask(__name__)
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', '100'))
-DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
+# Changed to use relative path by default, but allow override with absolute path
+DOWNLOAD_FOLDER_ENV = os.getenv('DOWNLOAD_FOLDER')
+if DOWNLOAD_FOLDER_ENV:
+    DOWNLOAD_FOLDER = DOWNLOAD_FOLDER_ENV
+else:
+    # Use relative 'downloads' folder by default, creating it if needed
+    DOWNLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'downloads')
 APP_VERSION = os.getenv('APP_VERSION', '1.0.0')
 
 metrics_registry = CollectorRegistry()
@@ -63,7 +71,24 @@ def after_request(response):
     active_requests.dec()
     return response
 
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+# Create download folder with error handling
+try:
+    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+    logger.info(f"Download folder created/verified: {DOWNLOAD_FOLDER}")
+except PermissionError:
+    logger.warning(f"Permission denied creating download folder: {DOWNLOAD_FOLDER}")
+    # Try to create in current directory as fallback
+    fallback_folder = os.path.join(os.getcwd(), "downloads")
+    os.makedirs(fallback_folder, exist_ok=True)
+    DOWNLOAD_FOLDER = fallback_folder
+    logger.info(f"Using fallback download folder: {DOWNLOAD_FOLDER}")
+except Exception as e:
+    logger.error(f"Error creating download folder: {e}")
+    # Try to create in current directory as fallback
+    fallback_folder = os.path.join(os.getcwd(), "downloads")
+    os.makedirs(fallback_folder, exist_ok=True)
+    DOWNLOAD_FOLDER = fallback_folder
+    logger.info(f"Using fallback download folder: {DOWNLOAD_FOLDER}")
 
 @app.route('/')
 def home():
@@ -153,11 +178,11 @@ def get_info():
         
         logger.info(f"Getting info for video: {video_url}")
         
-        ydl_opts = {
+        ydl_opts: Dict[str, Any] = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False
-        }  # type: dict
+        }
         
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -196,7 +221,7 @@ def get_info():
 
 @app.route('/download', methods=['POST'])
 def download():
-    """Download video endpoint - returns video information"""
+    """Download video endpoint - actually downloads the video"""
     start_time = time.time()
     
     try:
@@ -233,7 +258,8 @@ def download():
         }
         
         with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
+            # Actually download the video
+            info = ydl.extract_info(video_url, download=True)
             
             filesize = info.get('filesize') or info.get('filesize_approx', 0)
             filesize_mb = filesize / (1024 * 1024) if filesize else 0
@@ -246,9 +272,22 @@ def download():
                     "status": "failed"
                 }), 400
             
+            # Extract filename from the downloaded file
+            filename = None
+            filepath = info.get('filepath')
+            if filepath and isinstance(filepath, str):
+                filename = os.path.basename(filepath)
+            else:
+                title = info.get('title')
+                ext = info.get('ext')
+                if title and ext:
+                    # Clean the title to create a valid filename
+                    clean_title = str(title).replace('/', '_').replace('\\', '_')
+                    filename = f"{clean_title}.{ext}"
+            
             response_data = {
                 "status": "success",
-                "message": "Video information retrieved (download simulation)",
+                "message": "Video downloaded successfully",
                 "video": {
                     "title": info.get('title'),
                     "duration": info.get('duration'),
@@ -256,16 +295,16 @@ def download():
                     "view_count": info.get('view_count'),
                     "filesize_mb": round(filesize_mb, 2),
                     "quality": quality,
-                    "format": info.get('ext')
-                },
-                "note": "In production, file would be downloaded to server"
+                    "format": info.get('ext'),
+                    "filename": filename
+                }
             }
             
             download_requests_total.labels(status='success').inc()
             duration = time.time() - start_time
             download_duration_seconds.observe(duration)
             
-            logger.info(f"Successfully processed: {info.get('title')} in {duration:.2f}s")
+            logger.info(f"Successfully downloaded: {info.get('title')} to {DOWNLOAD_FOLDER}")
             return jsonify(response_data)
             
     except Exception as e:

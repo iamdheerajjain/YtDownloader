@@ -49,6 +49,12 @@ spec:
             - name: MAX_DOWNLOAD_SIZE
               value: "100"
             - name: DOWNLOAD_FOLDER
-              value: "downloads"
+              value: "/downloads"
             - name: APP_VERSION
               value: "1.0.0"
+          volumeMounts:
+            - name: downloads-storage
+              mountPath: /downloads
+      volumes:
+        - name: downloads-storage
+          emptyDir: {}
